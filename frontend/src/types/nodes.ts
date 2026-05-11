@@ -3,7 +3,7 @@ import type { AlgorithmId } from './algorithms';
 
 export type { NormalizedBytes, CoreInputPreview };
 
-export type PortType = 'plaintext' | 'key' | 'iv' | 'ciphertext' | 'tag' | 'ad';
+export type PortType = 'plaintext' | 'key' | 'iv' | 'ciphertext' | 'tag' | 'ad' | 'message' | 'digest';
 
 export interface NodeBaseData {
   label: string;
@@ -84,14 +84,36 @@ export interface OutputNodeData extends NodeBaseData {
   format: 'hex' | 'base64';
 }
 
+/** Hash algorithm node — SHA-3 family (FIPS 202) ve BLAKE2 (RFC 7693) */
+export interface HashNodeData extends NodeBaseData {
+  type: 'hash';
+  algorithm: AlgorithmId;
+  /** XOF output length in bytes (only used when algorithm.isXof === true) */
+  outputLength: number;
+  // Inputs (populated during pipeline execution)
+  messageInput?: string;
+  // BLAKE2 parameter block (RFC 7693) — hex string, opsiyonel; SHA-3 / SHAKE için yok sayılır
+  blake2Key?: string;
+  blake2Salt?: string;
+  blake2Person?: string;
+  // Outputs
+  digestOutput?: string;
+  digestBase64?: string;
+  digestBits?: number;
+  // API metadata
+  implemented?: boolean;
+  apiMessage?: string;
+}
+
 export type CryptoNodeData =
   | InputNodeData
   | KeyNodeData
   | Grain128NodeData
   | AlgorithmNodeData
+  | HashNodeData
   | OutputNodeData;
 
-export type NodeType = 'inputNode' | 'adInputNode' | 'keyNode' | 'grain128Node' | 'algorithmNode' | 'outputNode';
+export type NodeType = 'inputNode' | 'adInputNode' | 'keyNode' | 'grain128Node' | 'algorithmNode' | 'hashNode' | 'outputNode';
 
 export interface PaletteItem {
   nodeType: NodeType;

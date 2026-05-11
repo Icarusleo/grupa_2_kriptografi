@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { AlgorithmSelector } from './components/sidebar/AlgorithmSelector';
 import { FlowCanvas } from './components/canvas/FlowCanvas';
 import { useFlowStore } from './hooks/useFlowStore';
-import { fetchHashAlgorithms } from './api/hashApi';
 
 function PaddingWarningModal({ onConfirm }: { onConfirm: () => void }) {
   return (
@@ -83,15 +81,6 @@ function AppInner() {
     clearAll,
     setNodes,
   } = useFlowStore();
-  const [hashesLoaded, setHashesLoaded] = useState(false);
-
-  useEffect(() => {
-    fetchHashAlgorithms().finally(() => setHashesLoaded(true));
-  }, []);
-
-  if (!hashesLoaded) {
-    return <div style={{ color: 'white', padding: 20 }}>Yükleniyor...</div>;
-  }
 
   return (
     <div className="flex w-full h-full overflow-hidden" style={{ background: '#1a1f1a' }}>

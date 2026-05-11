@@ -8,17 +8,23 @@ function AccordionItem({ algo, isOpen, onToggle }: {
   isOpen: boolean;
   onToggle: () => void;
 }) {
+  const isHash = algo.kind === 'hash';
   const onDragStart = (event: React.DragEvent) => {
-    event.dataTransfer.setData('application/reactflow', 'algorithmNode');
+    event.dataTransfer.setData('application/reactflow', isHash ? 'hashNode' : 'algorithmNode');
     event.dataTransfer.setData('application/algorithm-id', algo.id);
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const badges = [
-    `Key: ${algo.keyBits}b`,
-    ...(algo.ivBits > 0 ? [`IV: ${algo.ivBits}b`] : ['No IV']),
-    ...(algo.tagBits > 0 ? [`Tag: ${algo.tagBits}b`] : []),
-  ];
+  const badges = isHash
+    ? [
+        algo.isXof ? 'XOF' : `Digest: ${algo.digestBits}b`,
+        'FIPS 202',
+      ]
+    : [
+        `Key: ${algo.keyBits}b`,
+        ...(algo.ivBits > 0 ? [`IV: ${algo.ivBits}b`] : ['No IV']),
+        ...(algo.tagBits > 0 ? [`Tag: ${algo.tagBits}b`] : []),
+      ];
 
   return (
     <div

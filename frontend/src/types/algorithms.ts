@@ -10,7 +10,16 @@ export type AlgorithmId =
   | 'hc-128'
   | 'hc-256'
   | 'rabbit'
-  | string;
+  | 'sha3-224'
+  | 'sha3-256'
+  | 'sha3-384'
+  | 'sha3-512'
+  | 'shake-128'
+  | 'shake-256'
+  | 'blake2b'
+  | 'blake2s';
+
+export type AlgorithmKind = 'aead' | 'stream' | 'hash';
 
 export interface AlgorithmDef {
   id: AlgorithmId;
@@ -24,6 +33,11 @@ export interface AlgorithmDef {
   description: string;
   category: string;
   group?: string;
+  kind?: AlgorithmKind;
+  /** Hash digest size in bits (only for fixed-output hash algorithms) */
+  digestBits?: number;
+  /** Whether the algorithm is an extendable-output function (SHAKE) */
+  isXof?: boolean;
 }
 
 export const ALGORITHMS: AlgorithmDef[] = [
@@ -168,14 +182,134 @@ export const ALGORITHMS: AlgorithmDef[] = [
     category: 'Hash Fonksiyonları',
     group: 'Software oriented stream ciphers',
   },
+
+  // ── SHA-3 Family (NIST FIPS 202) ──────────────────────────────────────────
+  {
+    id: 'sha3-224',
+    name: 'SHA3-224',
+    keyBits: 0,
+    ivBits: 0,
+    tagBits: 0,
+    digestBits: 224,
+    kind: 'hash',
+    color: '#fcd34d',
+    accentColor: '#3a2a0a',
+    icon: '#',
+    description: 'Keccak-based hash · 224-bit digest · NIST FIPS 202',
+    category: 'Hash Fonksiyonları',
+    group: 'NIST FIPS 202 (SHA-3)',
+  },
+  {
+    id: 'sha3-256',
+    name: 'SHA3-256',
+    keyBits: 0,
+    ivBits: 0,
+    tagBits: 0,
+    digestBits: 256,
+    kind: 'hash',
+    color: '#fbbf24',
+    accentColor: '#3a2a0a',
+    icon: '#',
+    description: 'Keccak-based hash · 256-bit digest · NIST FIPS 202',
+    category: 'Hash Fonksiyonları',
+    group: 'NIST FIPS 202 (SHA-3)',
+  },
+  {
+    id: 'sha3-384',
+    name: 'SHA3-384',
+    keyBits: 0,
+    ivBits: 0,
+    tagBits: 0,
+    digestBits: 384,
+    kind: 'hash',
+    color: '#f59e0b',
+    accentColor: '#3a2a0a',
+    icon: '#',
+    description: 'Keccak-based hash · 384-bit digest · NIST FIPS 202',
+    category: 'Hash Fonksiyonları',
+    group: 'NIST FIPS 202 (SHA-3)',
+  },
+  {
+    id: 'sha3-512',
+    name: 'SHA3-512',
+    keyBits: 0,
+    ivBits: 0,
+    tagBits: 0,
+    digestBits: 512,
+    kind: 'hash',
+    color: '#d97706',
+    accentColor: '#3a1f0a',
+    icon: '#',
+    description: 'Keccak-based hash · 512-bit digest · NIST FIPS 202',
+    category: 'Hash Fonksiyonları',
+    group: 'NIST FIPS 202 (SHA-3)',
+  },
+  {
+    id: 'shake-128',
+    name: 'SHAKE128',
+    keyBits: 0,
+    ivBits: 0,
+    tagBits: 0,
+    kind: 'hash',
+    isXof: true,
+    color: '#a7f3d0',
+    accentColor: '#0a3a2a',
+    icon: 'X',
+    description: 'Extendable-output function · değişken uzunluk · NIST FIPS 202',
+    category: 'Hash Fonksiyonları',
+    group: 'NIST FIPS 202 (SHA-3)',
+  },
+  {
+    id: 'shake-256',
+    name: 'SHAKE256',
+    keyBits: 0,
+    ivBits: 0,
+    tagBits: 0,
+    kind: 'hash',
+    isXof: true,
+    color: '#6ee7b7',
+    accentColor: '#0a3a2a',
+    icon: 'X',
+    description: 'Extendable-output function · değişken uzunluk · NIST FIPS 202',
+    category: 'Hash Fonksiyonları',
+    group: 'NIST FIPS 202 (SHA-3)',
+  },
+
+  // ── BLAKE2 Family (RFC 7693) ───────────────────────────────────────────────
+  {
+    id: 'blake2b',
+    name: 'BLAKE2b',
+    keyBits: 0,
+    ivBits: 0,
+    tagBits: 0,
+    digestBits: 512,
+    kind: 'hash',
+    isXof: true,
+    color: '#c4b5fd',
+    accentColor: '#1f1846',
+    icon: 'B',
+    description: '64-bit word · 12 round · 1..64 byte digest · RFC 7693',
+    category: 'Hash Fonksiyonları',
+    group: 'BLAKE2 (RFC 7693)',
+  },
+  {
+    id: 'blake2s',
+    name: 'BLAKE2s',
+    keyBits: 0,
+    ivBits: 0,
+    tagBits: 0,
+    digestBits: 256,
+    kind: 'hash',
+    isXof: true,
+    color: '#a78bfa',
+    accentColor: '#1f1846',
+    icon: 'B',
+    description: '32-bit word · 10 round · 1..32 byte digest · RFC 7693',
+    category: 'Hash Fonksiyonları',
+    group: 'BLAKE2 (RFC 7693)',
+  },
 ];
 
 export function getAlgorithm(id: AlgorithmId): AlgorithmDef {
   return ALGORITHMS.find((a) => a.id === id) ?? ALGORITHMS[0];
-}
-
-export function addDynamicAlgorithm(algo: AlgorithmDef) {
-  if (!ALGORITHMS.find(a => a.id === algo.id)) {
-    ALGORITHMS.push(algo);
-  }
 }
