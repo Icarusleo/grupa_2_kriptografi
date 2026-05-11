@@ -1,0 +1,3 @@
+g++ -O3 -shared -o grain.dll grain128aead-v2_opt.cpp -fPIC -static-libgcc -static-libstdc++
+
+c++ -> dll conversion

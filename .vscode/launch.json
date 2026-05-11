@@ -1,0 +1,50 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend: FastAPI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["server:app", "--reload"],
+      "cwd": "${workspaceFolder}/backend/api",
+      "python": "${workspaceFolder}/backend/api/venv/bin/python",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend/api"
+      }
+    },
+    {
+      "name": "Frontend: Dev Server",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/frontend",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Frontend: Chrome (Dev)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/src",
+      "sourceMapPathOverrides": {
+        "webpack:///src/*": "${webRoot}/*"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Frontend: Start + Open Chrome",
+      "configurations": ["Frontend: Dev Server", "Frontend: Chrome (Dev)"],
+      "stopAll": true
+    },
+    {
+      "name": "Full Stack: Backend + Frontend",
+      "configurations": ["Backend: FastAPI", "Frontend: Dev Server"],
+      "stopAll": true
+    }
+  ]
+}
