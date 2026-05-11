@@ -14,11 +14,18 @@ function AccordionItem({ algo, isOpen, onToggle }: {
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const badges = [
-    `Key: ${algo.keyBits}b`,
-    ...(algo.ivBits > 0 ? [`IV: ${algo.ivBits}b`] : ['No IV']),
-    ...(algo.tagBits > 0 ? [`Tag: ${algo.tagBits}b`] : []),
-  ];
+  const badges = algo.isHash
+    ? [
+        `Digest: ${algo.digestBits ?? '?'}b`,
+        `Block: ${algo.blockBits ?? '?'}b`,
+        ...(algo.rounds ? [`${algo.rounds} tur`] : []),
+        'Key yok · IV yok',
+      ]
+    : [
+        `Key: ${algo.keyBits}b`,
+        ...(algo.ivBits > 0 ? [`IV: ${algo.ivBits}b`] : ['No IV']),
+        ...(algo.tagBits > 0 ? [`Tag: ${algo.tagBits}b`] : []),
+      ];
 
   return (
     <div

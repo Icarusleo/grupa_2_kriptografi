@@ -1,5 +1,5 @@
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Cpu } from 'lucide-react';
+import { Cpu, Hash } from 'lucide-react';
 import { BaseNode } from './BaseNode';
 import { AlgorithmNodeData } from '../../types/nodes';
 import { getAlgorithm } from '../../types/algorithms';
@@ -79,9 +79,108 @@ function CoreInputSection({ cp }: { cp: CoreInputPreview }) {
   );
 }
 
+function HashOutField({ label, value, color }: { label: string; value?: string; color: string }) {
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 11, color, fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      <div style={{
+        fontSize: 11, fontFamily: 'monospace', padding: '6px 8px', borderRadius: 5,
+        background: '#181818', color: value ? color : '#4a4a4a',
+        border: `1px solid ${color}33`, wordBreak: 'break-all', lineHeight: 1.5,
+        minHeight: 14,
+      }}>
+        {value ?? '— henüz hesaplanmadı —'}
+      </div>
+    </div>
+  );
+}
+
+/** Dedicated render path for cryptographic hash functions (MD5, SHA-1, …) */
+function HashNodeView({ id, nodeData, algo, selected }: {
+  id: string;
+  nodeData: AlgorithmNodeData;
+  algo: ReturnType<typeof getAlgorithm>;
+  selected?: boolean;
+}) {
+  const hasPlaintext = !!nodeData.plaintextInput;
+  const badges = [
+    `Digest: ${algo.digestBits ?? '?'}b`,
+    `Block: ${algo.blockBits ?? '?'}b`,
+    ...(algo.rounds ? [`${algo.rounds} tur`] : []),
+    'Key yok · IV yok',
+  ];
+  return (
+    <BaseNode
+      id={id}
+      title={algo.name}
+      icon={<Hash size={13} />}
+      progress={nodeData.progress}
+      processed={nodeData.processed}
+      error={nodeData.error}
+      selected={selected}
+      accentColor={algo.accentColor}
+      minWidth={420}
+      helpText={`${algo.name} kriptografik özet (hash) fonksiyonu. Plaintext girdisini bağlayıp ▶ Run'a bastığınızda ${algo.digestBits ?? ''}-bit özet üretir. Anahtar veya IV gerektirmez; tek yönlüdür.`}
+    >
+      <div style={{ fontSize: 11, color: algo.color, fontFamily: 'monospace', marginBottom: 8 }}>
+        {algo.description}
+      </div>
+
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+        {badges.map((b) => (
+          <span key={b} style={{
+            fontSize: 9, padding: '2px 6px', borderRadius: 4, fontFamily: 'monospace',
+            background: '#181818', color: `${algo.color}cc`, border: `1px solid ${algo.color}33`,
+          }}>{b}</span>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600,
+          fontFamily: 'monospace', padding: '3px 8px', borderRadius: 5,
+          background: hasPlaintext ? '#1a2a1a' : '#1e1818',
+          border: `1px solid ${hasPlaintext ? '#d1d5db80' : '#3a2a2a'}`,
+          color: hasPlaintext ? '#d1d5db' : '#5a4a4a',
+        }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', display: 'inline-block', background: hasPlaintext ? '#d1d5db' : '#3a2a2a' }} />
+          Plaintext
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', paddingRight: 18 }}>
+          <span style={{ fontSize: 11, color: algo.color, fontFamily: 'monospace', fontWeight: 600 }}>özet (digest)</span>
+        </div>
+      </div>
+
+      {nodeData.processed && nodeData.hashInputBytes !== undefined && (
+        <div style={{ fontSize: 11, color: '#6b9a6b', fontFamily: 'monospace', marginBottom: 4 }}>
+          Girdi: {nodeData.hashInputBytes} byte ({nodeData.hashInputBytes * 8} bit)
+        </div>
+      )}
+
+      <HashOutField label={`${algo.name} Özeti (HEX)`} value={nodeData.ciphertextOutput} color={algo.color} />
+      <HashOutField label="Base64" value={nodeData.ciphertextBase64} color="#9ca3af" />
+
+      {!hasPlaintext && (
+        <p style={{ fontSize: 11, color: '#fbbf24', marginTop: 8 }}>
+          Plaintext bağlantısını yap, ardından ▶ Run'a bas.
+        </p>
+      )}
+
+      <Handle type="target" position={Position.Left} id="plaintext"
+        style={{ left: -8, top: '50%', width: 14, height: 14, background: '#e5e7eb', borderColor: '#9ca3af', borderWidth: 2 }} />
+      <Handle type="source" position={Position.Right} id="ciphertext"
+        style={{ right: -8, top: '50%', width: 14, height: 14, background: '#e9d5ff', borderColor: '#a78bfa', borderWidth: 2 }} />
+    </BaseNode>
+  );
+}
+
 export function AlgorithmNode({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as AlgorithmNodeData;
   const algo = getAlgorithm(nodeData.algorithm ?? 'grain128aead');
+
+  if (algo.isHash) {
+    return <HashNodeView id={id} nodeData={nodeData} algo={algo} selected={selected} />;
+  }
 
   const hasKey = !!nodeData.keyInput;
   const hasIV = !!nodeData.ivInput;

@@ -28,6 +28,21 @@ function zeroPadHex(hex: string, targetBytes: number): string {
   return hex.padEnd(targetBytes * 2, '0');
 }
 
+/** Byte length of an EncodedValue (matches the backend's decoding rules) */
+function encodedByteLength(ev: EncodedValue): number {
+  const v = ev.value ?? '';
+  switch (ev.encoding) {
+    case 'hex':
+      return Math.ceil(v.replace(/\s/g, '').length / 2);
+    case 'base64':
+      try { return atob(v).length; } catch { return 0; }
+    case 'bits':
+      return Math.ceil(v.replace(/\s/g, '').length / 8);
+    default: // utf8
+      return new TextEncoder().encode(v).length;
+  }
+}
+
 function buildEdgeMap(edges: Edge[]) {
   const map = new Map<string, { sourceHandle: string; targetHandle: string; sourceNodeId: string }[]>();
   for (const edge of edges) {
@@ -225,9 +240,9 @@ export function useFlowStore() {
           const algo = getAlgorithm(aData.algorithm ?? 'grain128aead');
           const { keyInput, ivInput, plaintextEncoded, adEncoded } = gatherAlgoInputs(node.id, nodeMap, edgesByTarget);
 
-          if (algo.category === 'Cryptography Hash Functions') {
+          if (algo.isHash) {
             if (!plaintextEncoded) {
-              updatedNodes[i] = { ...node, data: { ...aData, error: 'Missing input. Connect Plaintext.', progress: 0, processed: false } as unknown as Record<string, unknown> };
+              updatedNodes[i] = { ...node, data: { ...aData, error: 'Girdi eksik. Plaintext bağlayın.', progress: 0, processed: false } as unknown as Record<string, unknown> };
               nodeMap.set(node.id, updatedNodes[i]);
               continue;
             }
@@ -242,13 +257,14 @@ export function useFlowStore() {
                 data: {
                   ...aData,
                   plaintextInput: plaintextEncoded.value,
+                  hashInputBytes: encodedByteLength(plaintextEncoded),
                   ciphertextOutput: result.hash.hex,
                   ciphertextBase64: result.hash.base64,
                   tagOutput: undefined,
                   tagBase64: undefined,
                   nistCiphertextWithTag: result.hash.hex,
                   implemented: true,
-                  apiMessage: `${algo.name} hash computed`,
+                  apiMessage: `${algo.name} özeti hesaplandı`,
                   coreInputPreview: null,
                   progress: 100, processed: true, error: undefined,
                 } as unknown as Record<string, unknown>,

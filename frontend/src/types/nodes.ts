@@ -68,6 +68,8 @@ export interface AlgorithmNodeData extends NodeBaseData {
   nfsrState?: number[];
   currentRound?: number;
   coreInputPreview?: CoreInputPreview | null;
+  // Hash-function specific
+  hashInputBytes?: number;
   // API metadata
   implemented?: boolean;
   apiMessage?: string;
