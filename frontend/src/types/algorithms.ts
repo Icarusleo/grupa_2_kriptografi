@@ -17,7 +17,8 @@ export type AlgorithmId =
   | 'shake-128'
   | 'shake-256'
   | 'blake2b'
-  | 'blake2s';
+  | 'blake2s'
+  | string;
 
 export type AlgorithmKind = 'aead' | 'stream' | 'hash';
 
@@ -34,10 +35,14 @@ export interface AlgorithmDef {
   category: string;
   group?: string;
   kind?: AlgorithmKind;
+  // ── Hash-function specific metadata (optional) ───────────────────────────
+  isHash?: boolean;
   /** Hash digest size in bits (only for fixed-output hash algorithms) */
   digestBits?: number;
   /** Whether the algorithm is an extendable-output function (SHAKE) */
   isXof?: boolean;
+  blockBits?: number;
+  rounds?: number;
 }
 
 export const ALGORITHMS: AlgorithmDef[] = [
@@ -312,4 +317,10 @@ export const ALGORITHMS: AlgorithmDef[] = [
 
 export function getAlgorithm(id: AlgorithmId): AlgorithmDef {
   return ALGORITHMS.find((a) => a.id === id) ?? ALGORITHMS[0];
+}
+
+export function addDynamicAlgorithm(algo: AlgorithmDef) {
+  if (!ALGORITHMS.find((a) => a.id === algo.id)) {
+    ALGORITHMS.push(algo);
+  }
 }

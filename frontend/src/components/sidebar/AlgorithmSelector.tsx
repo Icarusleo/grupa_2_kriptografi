@@ -8,7 +8,7 @@ function AccordionItem({ algo, isOpen, onToggle }: {
   isOpen: boolean;
   onToggle: () => void;
 }) {
-  const isHash = algo.kind === 'hash';
+  const isHash = algo.kind === 'hash' || algo.isHash === true;
   const onDragStart = (event: React.DragEvent) => {
     event.dataTransfer.setData('application/reactflow', isHash ? 'hashNode' : 'algorithmNode');
     event.dataTransfer.setData('application/algorithm-id', algo.id);
@@ -17,8 +17,10 @@ function AccordionItem({ algo, isOpen, onToggle }: {
 
   const badges = isHash
     ? [
-        algo.isXof ? 'XOF' : `Digest: ${algo.digestBits}b`,
-        'FIPS 202',
+        algo.isXof ? 'XOF' : `Digest: ${algo.digestBits ?? '?'}b`,
+        ...(algo.blockBits ? [`Block: ${algo.blockBits}b`] : []),
+        ...(algo.rounds ? [`${algo.rounds} tur`] : []),
+        ...(algo.kind === 'hash' ? ['FIPS 202'] : ['Key yok · IV yok']),
       ]
     : [
         `Key: ${algo.keyBits}b`,
@@ -157,6 +159,82 @@ function GroupHeader({ label }: { label: string }) {
   );
 }
 
+const GOST_HASH_API_GROUP = 'GOST Hash';
+
+function GostHashVersionPicker({
+  algos,
+  openId,
+  setOpenId,
+}: {
+  algos: AlgorithmDef[];
+  openId: string | null;
+  setOpenId: (id: string | null) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const accent = algos[0]?.color ?? '#d8b4e2';
+
+  return (
+    <div style={{ marginTop: 5, marginBottom: 4 }}>
+      <div
+        style={{
+          borderRadius: 8,
+          border: `1.5px solid ${expanded ? accent : '#2a3a2a'}`,
+          background: expanded ? `${accent}12` : '#141e14',
+          transition: 'all 0.18s',
+          userSelect: 'none',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            width: '100%',
+            padding: '9px 11px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          <span style={{
+            fontSize: 12,
+            fontWeight: 700,
+            fontFamily: 'monospace',
+            color: expanded ? accent : '#6a9a6a',
+            flex: 1,
+          }}>
+            GOST HASH
+          </span>
+          <ChevronDown
+            size={13}
+            color={expanded ? accent : '#4a6a4a'}
+            style={{
+              flexShrink: 0,
+              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.18s',
+            }}
+          />
+        </button>
+        {expanded && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: '0 8px 10px' }}>
+            {algos.map((algo) => (
+              <AccordionItem
+                key={algo.id}
+                algo={algo}
+                isOpen={openId === algo.id}
+                onToggle={() => setOpenId(openId === algo.id ? null : algo.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 type Grouped = {
   category: string;
   groups: { group: string; algos: AlgorithmDef[] }[];
@@ -254,19 +332,29 @@ export function AlgorithmSelector() {
           grouped.map(({ category, groups }) => (
             <div key={category}>
               <CategoryHeader label={category} />
-              {groups.map(({ group, algos }) => (
-                <div key={group}>
-                  {group && <GroupHeader label={group} />}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 5, marginBottom: 4 }}>
-                    {algos.map((algo) => (
-                      <AccordionItem
-                        key={algo.id}
-                        algo={algo}
-                        isOpen={openId === algo.id}
-                        onToggle={() => setOpenId(openId === algo.id ? null : algo.id)}
-                      />
-                    ))}
-                  </div>
+              {groups.map(({ group, algos }, gi) => (
+                <div key={`${category}::${group || '_ungrouped'}::${gi}`}>
+                  {group === GOST_HASH_API_GROUP ? (
+                    <GostHashVersionPicker
+                      algos={algos}
+                      openId={openId}
+                      setOpenId={setOpenId}
+                    />
+                  ) : (
+                    <>
+                      {group && <GroupHeader label={group} />}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 5, marginBottom: 4 }}>
+                        {algos.map((algo) => (
+                          <AccordionItem
+                            key={algo.id}
+                            algo={algo}
+                            isOpen={openId === algo.id}
+                            onToggle={() => setOpenId(openId === algo.id ? null : algo.id)}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

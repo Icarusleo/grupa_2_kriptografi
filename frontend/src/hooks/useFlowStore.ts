@@ -9,6 +9,7 @@ import {
 } from '@xyflow/react';
 import { encryptAlgorithm, hashAlgorithm } from '../api/grain128api';
 import type { EncodedValue } from '../api/grain128api';
+import { computeHash } from '../api/hashApi';
 import { textToBytes, bytesToHex } from '../crypto/utils';
 import {
   InputNodeData,
@@ -26,6 +27,21 @@ const initialEdges: Edge[] = [];
 
 function zeroPadHex(hex: string, targetBytes: number): string {
   return hex.padEnd(targetBytes * 2, '0');
+}
+
+/** Byte length of an EncodedValue (matches the backend's decoding rules) */
+function encodedByteLength(ev: EncodedValue): number {
+  const v = ev.value ?? '';
+  switch (ev.encoding) {
+    case 'hex':
+      return Math.ceil(v.replace(/\s/g, '').length / 2);
+    case 'base64':
+      try { return atob(v).length; } catch { return 0; }
+    case 'bits':
+      return Math.ceil(v.replace(/\s/g, '').length / 8);
+    default: // utf8
+      return new TextEncoder().encode(v).length;
+  }
 }
 
 function buildEdgeMap(edges: Edge[]) {
@@ -224,6 +240,42 @@ export function useFlowStore() {
           const aData = node.data as unknown as AlgorithmNodeData;
           const algo = getAlgorithm(aData.algorithm ?? 'grain128aead');
           const { keyInput, ivInput, plaintextEncoded, adEncoded } = gatherAlgoInputs(node.id, nodeMap, edgesByTarget);
+
+          if (algo.isHash) {
+            if (!plaintextEncoded) {
+              updatedNodes[i] = { ...node, data: { ...aData, error: 'Girdi eksik. Plaintext bağlayın.', progress: 0, processed: false } as unknown as Record<string, unknown> };
+              nodeMap.set(node.id, updatedNodes[i]);
+              continue;
+            }
+            try {
+              const result = await computeHash({
+                algorithm_id: algo.id,
+                data: plaintextEncoded,
+                output_encoding: 'hex'
+              });
+              updatedNodes[i] = {
+                ...node,
+                data: {
+                  ...aData,
+                  plaintextInput: plaintextEncoded.value,
+                  hashInputBytes: encodedByteLength(plaintextEncoded),
+                  ciphertextOutput: result.hash.hex,
+                  ciphertextBase64: result.hash.base64,
+                  tagOutput: undefined,
+                  tagBase64: undefined,
+                  nistCiphertextWithTag: result.hash.hex,
+                  implemented: true,
+                  apiMessage: `${algo.name} özeti hesaplandı`,
+                  coreInputPreview: null,
+                  progress: 100, processed: true, error: undefined,
+                } as unknown as Record<string, unknown>,
+              };
+            } catch (e) {
+              updatedNodes[i] = { ...node, data: { ...aData, error: `API Error: ${String(e)}`, progress: 0, processed: false } as unknown as Record<string, unknown> };
+            }
+            nodeMap.set(node.id, updatedNodes[i]);
+            continue;
+          }
 
           if (!keyInput || !ivInput || !plaintextEncoded) {
             updatedNodes[i] = { ...node, data: { ...aData, error: 'Missing inputs. Connect Key, IV, and Plaintext.', progress: 0, processed: false } as unknown as Record<string, unknown> };

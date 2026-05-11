@@ -30,6 +30,9 @@ from pydantic import BaseModel, field_validator
 # Pure-Python Keccak-f[1600] / SHA-3 / SHAKE — bkz. sha3_pure.py
 from sha3_pure import hash_digest as sha3_hash_digest
 
+# Hash plugin registry (MD5, SHA-1, SHA-2 family, RIPEMD-160, GOST/Streebog)
+from hash_registry import HashRegistry
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).parent.resolve()
@@ -575,6 +578,8 @@ class HashRequest(BaseModel):
     key:    Optional[EncodedValue] = None
     salt:   Optional[EncodedValue] = None
     person: Optional[EncodedValue] = None
+    # Plugin-based generic compute endpoint için kullanılır (MD5, SHA-1, SHA-2, RIPEMD-160, GOST).
+    algorithm_id: Optional[str] = None
 
     @field_validator("output_length")
     @classmethod
@@ -680,6 +685,9 @@ def build_core_input_preview(plaintext: bytes, ad: bytes) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # FastAPI app
 # ══════════════════════════════════════════════════════════════════════════════
+
+# Hash plugin'leri dinamik yükle (MD5, SHA-1, SHA-2, RIPEMD-160, GOST/Streebog)
+HashRegistry.load_plugins(str(BASE_DIR / 'hash_plugins'))
 
 app = FastAPI(
     title="KriptoFlow API",
@@ -1307,6 +1315,41 @@ def handle_hash(algo_id: str, req: HashRequest) -> dict:
     if req.include_normalized_inputs:
         resp["normalized_inputs"] = {"message": normalized(message)}
     return resp
+
+
+# ── Plugin-based hash registry (MD5, SHA-1, SHA-2, RIPEMD-160, GOST) ─────────
+
+@app.get("/api/v1/hash/algorithms")
+def get_hash_algorithms():
+    return {
+        algo_id: {
+            "name": plugin.name,
+            "description": plugin.description,
+            "digest_size": plugin.digest_size,
+            "group": plugin.sidebar_group,
+            "icon": plugin.sidebar_icon,
+            "block_size": getattr(plugin, "block_size", 64),
+            "rounds": getattr(plugin, "rounds", 0),
+        }
+        for algo_id, plugin in HashRegistry.get_all().items()
+    }
+
+
+@app.post("/api/v1/hash/compute")
+def hash_compute(req: HashRequest):
+    plugin = HashRegistry.get(req.algorithm_id) if hasattr(req, "algorithm_id") else None
+    if not plugin:
+        raise HTTPException(404, f"Hash algoritması bulunamadı: {getattr(req, 'algorithm_id', None)}")
+    try:
+        data_bytes = decode_input(req.message)
+        hash_bytes = plugin.compute_hash(data_bytes)
+        return {
+            "algorithm":   plugin.name,
+            "digest_size": plugin.digest_size,
+            "hash":        normalized(hash_bytes, req.output_encoding),
+        }
+    except Exception as e:
+        raise HTTPException(422, f"Hash hesaplama hatası: {e}")
 
 
 @app.post("/api/v1/sha3-224/hash")
