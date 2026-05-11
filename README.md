@@ -16,6 +16,7 @@ Bu README, **yeni gelen kullanıcıların / diğer grupların** projeye eklenen 
 | `hash_plugins/sha256_plugin.py` | Sadece metadata (`block_size=64`, `rounds=64`) eklendi (hâlâ `hashlib` kullanıyor — istek dışıydı). |
 | `hash_registry.py` | `HashPlugin` taban sınıfına opsiyonel `block_size` ve `rounds` metadata'sı eklendi (geriye dönük uyumlu). |
 | `server.py` | `GET /api/v1/hash/algorithms` artık `block_size` ve `rounds` da döndürüyor. |
+| `test_hashes.py` | **YENİ** — MD5 & SHA-1 için 10 bilinen-cevap (RFC) test vektörü; `python test_hashes.py` veya `pytest test_hashes.py` ile çalışır. |
 
 ### Frontend (`frontend/src/`)
 | Dosya | Değişiklik |
@@ -84,20 +85,21 @@ Base64 (boş girdi): MD5 → `1B2M2Y8AsgTpgAmY7PhCfg==`, SHA-1 → `2jmj7l5rSw0y
 
 > Not: `dog` → `cog` tek harf farkı özetin tamamen değişmesini (çığ etkisi) gösterir; uzun girdiler (80 byte, 1 MB) çok-bloklu padding'in doğruluğunu test eder.
 
-### Hızlı self-test
+### Otomatik test (test vektörleri)
+
+Yukarıdaki tablonun tamamı `backend/api/test_hashes.py` içinde bilinen-cevap testi olarak tanımlıdır; ayrıca eklenti arayüzünü (`HashPlugin` sözleşmesi + metadata) de doğrular.
 
 ```bash
 cd backend/api
-python -c "
-import sys; sys.path.insert(0,'hash_plugins')
-from md5_plugin import md5
-from sha1_plugin import sha1
-import hashlib
-for t in [b'', b'abc', b'The quick brown fox jumps over the lazy dog', b'a'*1000000]:
-    assert md5(t)  == hashlib.md5(t).digest()
-    assert sha1(t) == hashlib.sha1(t).digest()
-print('MD5 & SHA-1 implementasyonlari DOGRU.')
-"
+python test_hashes.py          # tabloyu basar, sonunda: "TÜM TESTLER GEÇTİ (10 vektör × 2 algoritma)."
+# veya
+pytest test_hashes.py -v       # pytest kuruluysa
+```
+
+Beklenen çıktının son satırı:
+
+```
+TÜM TESTLER GEÇTİ (10 vektör × 2 algoritma).
 ```
 
 ---
