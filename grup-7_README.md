@@ -486,3 +486,133 @@ Bu, BLAKE2'de digest_size parameter block'a yazılıp h[0]'a XOR'landığı içi
 - **hashlib dokümantasyonu:** https://docs.python.org/3/library/hashlib.html — Yerleşik hash kütüphanesi
 
 ---
+
+# Test Vektörleri
+---
+
+## Test Vektörleri Nedir?
+
+Test vektörleri, bir hash algoritmasının doğru implemente edilip edilmediğini kontrol etmek için kullanılan **bilinen giriş-çıkış çiftleridir**. Her algoritmanın resmi test vektörleri, ilgili standart belgelerinde veya bağlı dokümanlarda yayınlanmıştır.
+
+---
+
+## MD5 Test Vektörleri
+
+**Kaynak:** [RFC 1321 — Appendix A.5](https://datatracker.ietf.org/doc/html/rfc1321#appendix-A.5)
+
+RFC 1321'in sonunda "MDTestSuite" başlığı altında 7 temel test vektörü yer alır. Bunlar herhangi bir MD5 implementasyonunu doğrulamak için yeterlidir.
+
+### Örnek Vektörler
+
+| Giriş | MD5 Çıkışı |
+|-------|------------|
+| `""` (boş) | `d41d8cd98f00b204e9800998ecf8427e` |
+| `"a"` | `0cc175b9c0f1b6a831c399e269772661` |
+| `"abc"` | `900150983cd24fb0d6963f7d28e17f72` |
+| `"message digest"` | `f96b697d7cb7938d525a2f31aaf161d0` |
+| `"abcdefghijklmnopqrstuvwxyz"` | `c3fcd3d76192e4007dfb496cca67e13b` |
+
+---
+
+## SHA-3 Test Vektörleri
+
+### Resmi Kaynaklar
+
+- **NIST CAVP — SHA-3 byte test vektörleri:**
+  https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/sha3/sha-3bytetestvectors.zip
+- **NIST CAVP — SHAKE test vektörleri:**
+  https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/sha3/shakebytetestvectors.zip
+- **NIST CAVP ana sayfası:**
+  https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/secure-hashing
+- **Keccak ekibi arşivi:**
+  https://keccak.team/archives.html
+
+> **Önemli not:** FIPS 202 standardının kendisi test vektörü içermez. Test vektörleri ayrı ZIP dosyalarında, `.rsp` (response) formatında dağıtılır. Her varyant için kısa mesaj (`ShortMsg`), uzun mesaj (`LongMsg`) ve Monte Carlo (`Monte`) dosyaları bulunur.
+
+### Dosya Formatı Örneği (`.rsp`)
+
+```
+Len = 0
+Msg = 00
+MD = a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a
+
+Len = 24
+Msg = 616263
+MD = 3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532
+```
+
+### Örnek Vektörler
+
+| Fonksiyon | Giriş | Çıkış |
+|-----------|-------|-------|
+| SHA3-256 | `""` | `a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a` |
+| SHA3-256 | `"abc"` | `3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532` |
+| SHA3-512 | `""` | `a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26` |
+| SHA3-512 | `"abc"` | `b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0` |
+| SHAKE128 (32 byte) | `""` | `7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef26` |
+| SHAKE256 (64 byte) | `""` | `46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762fd75dc4ddd8c0f200cb05019d67b592f6fc821c49479ab48640292eacb3b7c4be` |
+
+### Türetilmiş Fonksiyonlar (KMAC, cSHAKE, TupleHash)
+
+NIST SP 800-185 test örnekleri için: https://csrc.nist.gov/projects/cryptographic-standards-and-guidelines/example-values
+
+Bu sayfa adım adım hesaplama detayları içeren PDF örnekleri sunar.
+
+---
+
+## BLAKE2 Test Vektörleri
+
+### Resmi Kaynaklar
+
+- **RFC 7693 — Appendix A (BLAKE2b) ve Appendix B (BLAKE2s):**
+  https://datatracker.ietf.org/doc/html/rfc7693
+- **BLAKE2 resmi GitHub deposu (kapsamlı KAT):**
+  https://github.com/BLAKE2/BLAKE2/tree/master/testvectors
+
+> **RFC'nin avantajı:** SHA-3'ten farklı olarak BLAKE2 standardı, test vektörlerini **kendi içinde** barındırır. Appendix A'da BLAKE2b için "abc" girdisinin 12 round'unun ara state'leri adım adım gösterilir — implementasyonu debug etmek için ideal.
+
+### Kapsamlı Testler İçin GitHub
+
+`blake2-kat.json` dosyası **8000+** test vektörü içerir: anahtarsız mod, anahtarlı mod, farklı mesaj uzunlukları, farklı çıktı boyutları kapsanır.
+
+### JSON Formatı Örneği
+
+```json
+{
+  "hash": "blake2b",
+  "in": "00",
+  "key": "",
+  "out": "961f6dd1e4dd30f63901690c512e78e4b45e4742ed197c3c5e45c549fd25f2e4..."
+}
+```
+
+### Örnek Vektörler
+
+| Fonksiyon | Giriş | Çıkış |
+|-----------|-------|-------|
+| BLAKE2b (64 byte) | `""` | `786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce` |
+| BLAKE2b (64 byte) | `"abc"` | `ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d17d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923` |
+| BLAKE2s (32 byte) | `""` | `69217a3079908094e11121d042354a7c1f55b6482ca1a51e1b250dfd1ed0eef9` |
+| BLAKE2s (32 byte) | `"abc"` | `508c5e8c327c14e2e1a72ba34eeb452f37458b209ed63a294d999b4c86675982` |
+
+---
+
+## Kaynak Özet Tablosu
+
+| Algoritma | Test Vektörü Konumu | Vektör Sayısı |
+|-----------|---------------------|---------------|
+| MD5 | RFC 1321 Appendix A.5 (doküman içinde) | 7 temel |
+| SHA-3 | NIST CAVP ZIP dosyaları (ayrı) | Binlerce |
+| SHAKE | NIST CAVP ZIP dosyaları (ayrı) | Binlerce |
+| BLAKE2 | RFC 7693 Appendix A/B + GitHub JSON | 8000+ |
+
+---
+
+### Önemli Kenar Durumları
+
+Test vektörleri seçerken aşağıdaki durumlar mutlaka denenmelidir:
+
+- **Boş giriş** — padding mantığını test eder
+- **Block boyutu sınırları** — MD5/SHA-3 için padding boundary hatalarını yakalar
+- **Tam block kadar veri** — sıfır padding durumlarını test eder
+- **Uzun mesajlar** — counter overflow ve multi-block işleme hatalarını ortaya çıkarır
