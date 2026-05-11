@@ -39,9 +39,8 @@ export async function fetchHashAlgorithms(): Promise<Record<string, HashAlgorith
     
     // Per-algorithm cosmetic styling (everything else falls back to the default).
     const STYLE: Record<string, { color: string; accentColor: string; icon: string }> = {
-      md5:    { color: '#c4b5fd', accentColor: '#3b1d6e', icon: '#️⃣' },
-      sha1:   { color: '#86efac', accentColor: '#1f5132', icon: '🛡️' },
-      sha256: { color: '#7dd3fc', accentColor: '#1e3a5a', icon: '🔐' },
+      md5:  { color: '#c4b5fd', accentColor: '#3b1d6e', icon: '#️⃣' },
+      sha1: { color: '#86efac', accentColor: '#1f5132', icon: '🛡️' },
     };
     const DEFAULT_STYLE = { color: '#d8b4e2', accentColor: '#301040', icon: '🔢' };
 

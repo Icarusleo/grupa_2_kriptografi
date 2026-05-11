@@ -3,7 +3,7 @@ Bilinen-cevap (known-answer) test vektörleri — MD5 ve SHA-1 saf-Python
 implementasyonlarını doğrular.
 
 Kullanım:
-    python test_hashes.py            # tüm vektörleri çalıştır, özet bas
+    python test_hashes.py            # tüm vektörleri çalıştır, özet tablo bas
     pytest test_hashes.py            # pytest ile (kuruluysa)
 
 Referanslar:
@@ -39,9 +39,9 @@ VECTORS = [
     (b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
      "d174ab98d277d9f5a5611c2c9f419d9f",
      "761c457bf73b14d27e9e9265c46f4b4dda11f940"),
-    (b"1234567890" * 8,  # 80 bytes -> birden fazla 64-byte blok + padding
-     "57edf4a22be3c955ac49da2e2107b67a",
-     "50abf5706a150990a08b2c5ea40fa0e585554732"),
+    (b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",  # 56 byte -> çok-bloklu
+     "8215ef0796a20bcaaae116d3876c664a",
+     "84983e441c3bd26ebaae4aa1f95129e5e54670f1"),
     (b"The quick brown fox jumps over the lazy dog",
      "9e107d9d372bb6826bd81d3542a419d6",
      "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"),
