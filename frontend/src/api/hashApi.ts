@@ -8,6 +8,8 @@ export interface HashAlgorithmInfo {
   digest_size: number;
   group?: string;
   icon?: string;
+  block_size?: number;
+  rounds?: number;
 }
 
 export interface HashComputeRequest {
@@ -37,9 +39,24 @@ export async function fetchHashAlgorithms(): Promise<Record<string, HashAlgorith
     if (!res.ok) throw new Error('Failed to fetch hash algorithms');
     const data = await res.json();
     
+    // Per-algorithm cosmetic styling (everything else falls back to the default).
+    const STYLE: Record<string, { color: string; accentColor: string; icon: string }> = {
+      md5:  { color: '#c4b5fd', accentColor: '#3b1d6e', icon: '#️⃣' },
+      sha1: { color: '#86efac', accentColor: '#1f5132', icon: '🛡️' },
+    };
+    const DEFAULT_STYLE = { color: '#d8b4e2', accentColor: '#301040', icon: '🔢' };
+
     // Register them dynamically
     Object.entries(data).forEach(([id, info]) => {
       const hashInfo = info as HashAlgorithmInfo;
+      const digestBits = hashInfo.digest_size * 8;
+      const blockBits = (hashInfo.block_size ?? 64) * 8;
+      const rounds = hashInfo.rounds ?? 0;
+      const style = STYLE[id] ?? DEFAULT_STYLE;
+
+      const descParts = ['Hash', `${digestBits}-bit özet`, `${blockBits}-bit blok`];
+      if (rounds > 0) descParts.push(`${rounds} tur`);
+
       const algoDef: AlgorithmDef = {
         id,
         name: hashInfo.name,
@@ -52,6 +69,15 @@ export async function fetchHashAlgorithms(): Promise<Record<string, HashAlgorith
         description: hashInfo.description,
         category: 'Cryptography Hash Functions',
         group: hashInfo.group ?? 'Dynamic Hashes',
+        color: style.color,
+        accentColor: style.accentColor,
+        icon: style.icon,
+        description: descParts.join(' · '),
+        category: 'Cryptographic Hash Functions',
+        isHash: true,
+        digestBits,
+        blockBits,
+        rounds,
       };
       addDynamicAlgorithm(algoDef);
     });

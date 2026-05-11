@@ -24,6 +24,11 @@ export interface AlgorithmDef {
   description: string;
   category: string;
   group?: string;
+  // ── Hash-function specific metadata (optional) ───────────────────────────
+  isHash?: boolean;
+  digestBits?: number;
+  blockBits?: number;
+  rounds?: number;
 }
 
 export const ALGORITHMS: AlgorithmDef[] = [
