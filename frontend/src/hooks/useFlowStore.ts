@@ -7,7 +7,7 @@ import {
   Edge,
   Connection,
 } from '@xyflow/react';
-import { encryptAlgorithm } from '../api/grain128api';
+import { encryptAlgorithm, hashAlgorithm } from '../api/grain128api';
 import type { EncodedValue } from '../api/grain128api';
 import { computeHash } from '../api/hashApi';
 import { textToBytes, bytesToHex } from '../crypto/utils';
@@ -16,6 +16,7 @@ import {
   KeyNodeData,
   Grain128NodeData,
   AlgorithmNodeData,
+  HashNodeData,
   OutputNodeData,
 } from '../types/nodes';
 import { getAlgorithm } from '../types/algorithms';
@@ -290,14 +291,12 @@ export function useFlowStore() {
             continue;
           }
 
-          if (algo.ivBits > 0) {
-            const ivHexLen = algo.ivBits / 4;
-            const ivPattern = new RegExp(`^[0-9a-fA-F]{${ivHexLen}}$`);
-            if (!ivPattern.test(ivInput)) {
-              updatedNodes[i] = { ...node, data: { ...aData, error: `IV must be ${ivHexLen} hex chars (${algo.ivBits} bit)`, progress: 0, processed: false } as unknown as Record<string, unknown> };
-              nodeMap.set(node.id, updatedNodes[i]);
-              continue;
-            }
+          const ivHexLen = algo.ivBits / 4;
+          const ivPattern = new RegExp(`^[0-9a-fA-F]{${ivHexLen}}$`);
+          if (!ivPattern.test(ivInput)) {
+            updatedNodes[i] = { ...node, data: { ...aData, error: `IV must be ${ivHexLen} hex chars (${algo.ivBits} bit)`, progress: 0, processed: false } as unknown as Record<string, unknown> };
+            nodeMap.set(node.id, updatedNodes[i]);
+            continue;
           }
 
           try {
@@ -338,6 +337,70 @@ export function useFlowStore() {
           continue;
         }
 
+        // ── HashNode (SHA-3 family) ─────────────────────────────────────────
+        if (node.type === 'hashNode') {
+          const hData = node.data as unknown as HashNodeData;
+          const incomingEdges = edgesByTarget.get(node.id) ?? [];
+
+          let messageEncoded: EncodedValue | undefined;
+          for (const edge of incomingEdges) {
+            const sourceNode = nodeMap.get(edge.sourceNodeId);
+            if (!sourceNode) continue;
+            const isInputSource = sourceNode.type === 'inputNode' || sourceNode.type === 'adInputNode';
+            if (edge.targetHandle === 'message' && isInputSource) {
+              const id = sourceNode.data as unknown as InputNodeData;
+              // Hash: do NOT zero-pad — preserve the exact message bytes
+              messageEncoded = inputNodeToEncoded(id, false);
+            }
+          }
+
+          if (!messageEncoded) {
+            updatedNodes[i] = {
+              ...node,
+              data: { ...hData, error: 'Plaintext Input bağla (Message handle).', progress: 0, processed: false } as unknown as Record<string, unknown>,
+            };
+            nodeMap.set(node.id, updatedNodes[i]);
+            continue;
+          }
+
+          try {
+            const hashReq: Parameters<typeof hashAlgorithm>[1] = {
+              message: messageEncoded,
+              output_encoding: 'hex',
+              output_length: hData.outputLength,
+            };
+            // BLAKE2 (RFC 7693) parameter block — sadece blake2b/blake2s için gönder
+            if (hData.algorithm === 'blake2b' || hData.algorithm === 'blake2s') {
+              if (hData.blake2Key)    hashReq.key    = { value: hData.blake2Key,    encoding: 'hex' };
+              if (hData.blake2Salt)   hashReq.salt   = { value: hData.blake2Salt,   encoding: 'hex' };
+              if (hData.blake2Person) hashReq.person = { value: hData.blake2Person, encoding: 'hex' };
+            }
+            const result = await hashAlgorithm(hData.algorithm, hashReq);
+            updatedNodes[i] = {
+              ...node,
+              data: {
+                ...hData,
+                messageInput: messageEncoded.value,
+                digestOutput: result.digest.hex,
+                digestBase64: result.digest.base64,
+                digestBits: result.digest.bit_length,
+                implemented: result.implemented,
+                apiMessage: result.message,
+                progress: 100,
+                processed: true,
+                error: undefined,
+              } as unknown as Record<string, unknown>,
+            };
+          } catch (e) {
+            updatedNodes[i] = {
+              ...node,
+              data: { ...hData, error: `API Error: ${String(e)}`, progress: 0, processed: false } as unknown as Record<string, unknown>,
+            };
+          }
+          nodeMap.set(node.id, updatedNodes[i]);
+          continue;
+        }
+
         // ── OutputNode ───────────────────────────────────────────────────────
         if (node.type === 'outputNode') {
           const oData = node.data as unknown as OutputNodeData;
@@ -356,6 +419,7 @@ export function useFlowStore() {
 
             const isAlgoSource =
               sourceNode.type === 'grain128Node' || sourceNode.type === 'algorithmNode';
+            const isHashSource = sourceNode.type === 'hashNode';
 
             if (edge.targetHandle === 'ciphertext' && isAlgoSource) {
               const d = sourceNode.data as unknown as { ciphertextOutput?: string; ciphertextBase64?: string; nistCiphertextWithTag?: string; implemented?: boolean };
@@ -368,6 +432,13 @@ export function useFlowStore() {
               const d = sourceNode.data as unknown as { tagOutput?: string; tagBase64?: string };
               tagInput = d.tagOutput;
               tagBase64 = d.tagBase64;
+            }
+            // Hash digest can be routed into the Output node's "ciphertext" slot
+            if (edge.targetHandle === 'ciphertext' && isHashSource) {
+              const d = sourceNode.data as unknown as { digestOutput?: string; digestBase64?: string; implemented?: boolean };
+              ciphertextInput = d.digestOutput;
+              ciphertextBase64 = d.digestBase64;
+              implemented = d.implemented;
             }
           }
 

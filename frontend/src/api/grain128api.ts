@@ -83,6 +83,35 @@ export interface AEADDecryptResponse {
   normalized_inputs?: unknown | null;
 }
 
+// ── Hash request / response (SHA-3 family) ───────────────────────────────────
+
+export interface HashRequest {
+  message:          EncodedValue;
+  output_encoding:  OutputEncoding;
+  /** SHAKE output length in bytes — ignored for fixed-output SHA-3 variants */
+  output_length?:   number;
+  include_normalized_inputs?: boolean;
+  /** BLAKE2 parameter block (RFC 7693) — yok sayılır SHA-3 / SHAKE için */
+  key?:             EncodedValue;
+  salt?:            EncodedValue;
+  person?:          EncodedValue;
+}
+
+export interface HashResponse {
+  implemented:     boolean;
+  algorithm:       string;
+  message:         string;
+  digest:          NormalizedBytes;
+  digest_bytes:    number;
+  is_xof:          boolean;
+  normalized_inputs?: unknown | null;
+  blake2_parameters?: {
+    key_bytes:    number;
+    salt_bytes:   number;
+    person_bytes: number;
+  };
+}
+
 // ── Backward-compatible aliases (Grain-128AEAD) ───────────────────────────────
 
 export type GrainEncryptRequest  = AEADEncryptRequest;
@@ -161,6 +190,11 @@ export function encryptAlgorithm(algoId: string, req: AEADEncryptRequest) {
 export function decryptAlgorithm(algoId: string, req: AEADDecryptRequest) {
   const path = algoId === 'grain128aead' ? '/grain128aeadv2/decrypt' : `/${algoId}/decrypt`;
   return post<AEADDecryptResponse>(path, req);
+}
+
+/** SHA-3 family hash */
+export function hashAlgorithm(algoId: string, req: HashRequest) {
+  return post<HashResponse>(`/${algoId}/hash`, req);
 }
 
 // ── Parameters & Health ───────────────────────────────────────────────────────

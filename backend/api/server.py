@@ -27,11 +27,19 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 
+# Pure-Python Keccak-f[1600] / SHA-3 / SHAKE — bkz. sha3_pure.py
+from sha3_pure import hash_digest as sha3_hash_digest
+
+# Hash plugin registry (MD5, SHA-1, SHA-2 family, RIPEMD-160, GOST/Streebog)
 from hash_registry import HashRegistry
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).parent.resolve()
+
+# Pure-Python BLAKE2b / BLAKE2s (RFC 7693) — bkz. blake2/blake2.py
+sys.path.insert(0, str(BASE_DIR / 'blake2'))
+from blake2 import blake2b as _blake2b_digest, blake2s as _blake2s_digest  # type: ignore
 
 # ── Rabbit import ─────────────────────────────────────────────────────────────
 
@@ -560,6 +568,27 @@ class DecryptRequest(BaseModel):
     include_normalized_inputs: bool = False
 
 
+class HashRequest(BaseModel):
+    message: EncodedValue
+    output_encoding: OutputEncoding = "hex"
+    # SHAKE için isteğe bağlı çıktı uzunluğu (byte). Sabit-uzunluk SHA3 için yok sayılır.
+    output_length: int = 32
+    include_normalized_inputs: bool = False
+    # BLAKE2 (RFC 7693) parameter block alanları. SHA-3 / SHAKE için yok sayılır.
+    key:    Optional[EncodedValue] = None
+    salt:   Optional[EncodedValue] = None
+    person: Optional[EncodedValue] = None
+    # Plugin-based generic compute endpoint için kullanılır (MD5, SHA-1, SHA-2, RIPEMD-160, GOST).
+    algorithm_id: Optional[str] = None
+
+    @field_validator("output_length")
+    @classmethod
+    def validate_output_length(cls, value: int) -> int:
+        if not (1 <= value <= 1 << 16):
+            raise ValueError("output_length 1 ile 65536 byte arasında olmalı")
+        return value
+
+
 class Salsa20Request(BaseModel):
     key: EncodedValue
     nonce: EncodedValue
@@ -574,12 +603,6 @@ class Salsa20Request(BaseModel):
         if not (0 <= value <= 0xFFFFFFFF):
             raise ValueError("stream_index 0 ile 2^32-1 arasında olmalı")
         return value
-
-
-class HashRequest(BaseModel):
-    algorithm_id: str
-    data: EncodedValue
-    output_encoding: OutputEncoding = "hex"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -663,12 +686,12 @@ def build_core_input_preview(plaintext: bytes, ad: bytes) -> dict:
 # FastAPI app
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Load hash plugins dynamically
+# Hash plugin'leri dinamik yükle (MD5, SHA-1, SHA-2, RIPEMD-160, GOST/Streebog)
 HashRegistry.load_plugins(str(BASE_DIR / 'hash_plugins'))
 
 app = FastAPI(
     title="KriptoFlow API",
-    description="Grain-128AEAD · GIFT-COFB · ISAP · ASCON · XOODYAK · HC-128 · HC-256 · RC4 · Rabbit · Salsa20 · ChaCha20-Poly1305 · Hashes",
+    description="Grain-128AEAD · GIFT-COFB · ISAP · ASCON · XOODYAK · HC-128 · HC-256 · RC4 · Rabbit · Salsa20 · ChaCha20-Poly1305",
     version="2.4.0",
 )
 
@@ -905,6 +928,8 @@ def health():
     }
     algorithms["salsa20"]          = {"available": SALSA20.available,           "name": "Salsa20"}
     algorithms["chacha20poly1305"] = {"available": CHACHA20POLY1305_AVAILABLE,  "name": "ChaCha20-Poly1305"}
+    for h_id, (h_name, _, _) in HASH_ALGOS.items():
+        algorithms[h_id] = {"available": True, "name": h_name}
     return {"status": "ok", "algorithms": algorithms}
 
 
@@ -1196,7 +1221,103 @@ def chacha20poly1305_parameters():
     }
 
 
-# ── Cryptography Hash Functions ───────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# SHA-3 Hash Family (NIST FIPS 202) — hashlib built-in
+# ══════════════════════════════════════════════════════════════════════════════
+
+# (display_name, digest_bytes, is_xof)
+# is_xof=True → kullanıcı output_length ile çıktı uzunluğunu kontrol eder.
+# BLAKE2 üst sınıra (64/32) kadar değişken digest destekler.
+HASH_ALGOS: dict[str, tuple[str, int, bool]] = {
+    "sha3-224": ("SHA3-224", 28, False),
+    "sha3-256": ("SHA3-256", 32, False),
+    "sha3-384": ("SHA3-384", 48, False),
+    "sha3-512": ("SHA3-512", 64, False),
+    "shake-128": ("SHAKE128", 32, True),   # varsayılan 32B, kullanıcı output_length ile ayarlar
+    "shake-256": ("SHAKE256", 64, True),
+    "blake2b":  ("BLAKE2b",  64, True),    # 1..64 byte digest
+    "blake2s":  ("BLAKE2s",  32, True),    # 1..32 byte digest
+}
+
+
+def compute_hash(algo_id: str, message: bytes, output_length: int, *,
+                 key: bytes = b"", salt: bytes = b"", person: bytes = b"") -> bytes:
+    """
+    Pure-Python hash dispatcher. Hazır kütüphane kullanılmaz.
+        - SHA-3 / SHAKE   → sha3_pure (Keccak-f[1600])
+        - BLAKE2b/BLAKE2s → blake2 (RFC 7693, key/salt/person dahil)
+    """
+    try:
+        if algo_id in {"sha3-224", "sha3-256", "sha3-384", "sha3-512", "shake-128", "shake-256"}:
+            return sha3_hash_digest(algo_id, message, output_length)
+        if algo_id == "blake2b":
+            if not (1 <= output_length <= 64):
+                raise ValueError("BLAKE2b digest uzunluğu 1..64 byte aralığında olmalı")
+            return _blake2b_digest(message, output_length, key=key, salt=salt, person=person)
+        if algo_id == "blake2s":
+            if not (1 <= output_length <= 32):
+                raise ValueError("BLAKE2s digest uzunluğu 1..32 byte aralığında olmalı")
+            return _blake2s_digest(message, output_length, key=key, salt=salt, person=person)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    raise HTTPException(404, f"Bilinmeyen hash algoritması: {algo_id}")
+
+
+def handle_hash(algo_id: str, req: HashRequest) -> dict:
+    meta = HASH_ALGOS.get(algo_id)
+    if meta is None:
+        raise HTTPException(404, f"Bilinmeyen hash algoritması: {algo_id}")
+    display_name, default_len, is_xof = meta
+
+    try:
+        message = decode_input(req.message)
+    except Exception as e:
+        raise HTTPException(422, f"Girdi çözümleme hatası: {e}")
+
+    out_len = req.output_length if is_xof else default_len
+
+    # BLAKE2 parameter block (RFC 7693) — sadece BLAKE2 algoritmaları için decode edilir.
+    key    = b""
+    salt   = b""
+    person = b""
+    if algo_id.startswith("blake2"):
+        try:
+            if req.key:
+                key = decode_input(req.key)
+            if req.salt:
+                salt = decode_input(req.salt)
+            if req.person:
+                person = decode_input(req.person)
+        except Exception as e:
+            raise HTTPException(422, f"BLAKE2 parametre çözümleme hatası: {e}")
+
+    digest = compute_hash(algo_id, message, out_len, key=key, salt=salt, person=person)
+    enc    = req.output_encoding
+    if algo_id.startswith("blake2"):
+        description = f"{display_name} — pure-Python BLAKE2 (RFC 7693)"
+    else:
+        description = f"{display_name} — pure-Python Keccak-f[1600] (FIPS 202)"
+    resp   = {
+        "implemented":   True,
+        "algorithm":     display_name,
+        "message":       description,
+        "digest":        normalized(digest, enc),
+        "digest_bytes":  len(digest),
+        "is_xof":        is_xof,
+        "normalized_inputs": None,
+    }
+    if algo_id.startswith("blake2"):
+        resp["blake2_parameters"] = {
+            "key_bytes":    len(key),
+            "salt_bytes":   len(salt),
+            "person_bytes": len(person),
+        }
+    if req.include_normalized_inputs:
+        resp["normalized_inputs"] = {"message": normalized(message)}
+    return resp
+
+
+# ── Plugin-based hash registry (MD5, SHA-1, SHA-2, RIPEMD-160, GOST) ─────────
 
 @app.get("/api/v1/hash/algorithms")
 def get_hash_algorithms():
@@ -1213,23 +1334,139 @@ def get_hash_algorithms():
         for algo_id, plugin in HashRegistry.get_all().items()
     }
 
+
 @app.post("/api/v1/hash/compute")
-def compute_hash(req: HashRequest):
-    plugin = HashRegistry.get(req.algorithm_id)
+def hash_compute(req: HashRequest):
+    plugin = HashRegistry.get(req.algorithm_id) if hasattr(req, "algorithm_id") else None
     if not plugin:
-        raise HTTPException(404, f"Hash algoritması bulunamadı: {req.algorithm_id}")
-        
+        raise HTTPException(404, f"Hash algoritması bulunamadı: {getattr(req, 'algorithm_id', None)}")
     try:
-        data_bytes = decode_input(req.data)
+        data_bytes = decode_input(req.message)
         hash_bytes = plugin.compute_hash(data_bytes)
-        
         return {
-            "algorithm": plugin.name,
+            "algorithm":   plugin.name,
             "digest_size": plugin.digest_size,
-            "hash": normalized(hash_bytes, req.output_encoding)
+            "hash":        normalized(hash_bytes, req.output_encoding),
         }
     except Exception as e:
         raise HTTPException(422, f"Hash hesaplama hatası: {e}")
+
+
+@app.post("/api/v1/sha3-224/hash")
+def sha3_224_hash(req: HashRequest):
+    return handle_hash("sha3-224", req)
+
+
+@app.post("/api/v1/sha3-256/hash")
+def sha3_256_hash(req: HashRequest):
+    return handle_hash("sha3-256", req)
+
+
+@app.post("/api/v1/sha3-384/hash")
+def sha3_384_hash(req: HashRequest):
+    return handle_hash("sha3-384", req)
+
+
+@app.post("/api/v1/sha3-512/hash")
+def sha3_512_hash(req: HashRequest):
+    return handle_hash("sha3-512", req)
+
+
+@app.post("/api/v1/shake-128/hash")
+def shake_128_hash(req: HashRequest):
+    return handle_hash("shake-128", req)
+
+
+@app.post("/api/v1/shake-256/hash")
+def shake_256_hash(req: HashRequest):
+    return handle_hash("shake-256", req)
+
+
+@app.get("/api/v1/sha3-224/parameters")
+def sha3_224_parameters():
+    return {"algorithm": "SHA3-224", "digest_bits": 224, "block_bits": 1152, "is_xof": False, "standard": "NIST FIPS 202"}
+
+
+@app.get("/api/v1/sha3-256/parameters")
+def sha3_256_parameters():
+    return {"algorithm": "SHA3-256", "digest_bits": 256, "block_bits": 1088, "is_xof": False, "standard": "NIST FIPS 202"}
+
+
+@app.get("/api/v1/sha3-384/parameters")
+def sha3_384_parameters():
+    return {"algorithm": "SHA3-384", "digest_bits": 384, "block_bits": 832, "is_xof": False, "standard": "NIST FIPS 202"}
+
+
+@app.get("/api/v1/sha3-512/parameters")
+def sha3_512_parameters():
+    return {"algorithm": "SHA3-512", "digest_bits": 512, "block_bits": 576, "is_xof": False, "standard": "NIST FIPS 202"}
+
+
+@app.get("/api/v1/shake-128/parameters")
+def shake_128_parameters():
+    return {"algorithm": "SHAKE128", "digest_bits": "variable", "block_bits": 1344, "is_xof": True, "default_output_bytes": 32, "standard": "NIST FIPS 202"}
+
+
+@app.get("/api/v1/shake-256/parameters")
+def shake_256_parameters():
+    return {"algorithm": "SHAKE256", "digest_bits": "variable", "block_bits": 1088, "is_xof": True, "default_output_bytes": 64, "standard": "NIST FIPS 202"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BLAKE2 Hash Family (RFC 7693) — pure-Python, hazır kütüphane kullanılmaz
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/v1/blake2b/hash")
+def blake2b_hash(req: HashRequest):
+    return handle_hash("blake2b", req)
+
+
+@app.post("/api/v1/blake2s/hash")
+def blake2s_hash(req: HashRequest):
+    return handle_hash("blake2s", req)
+
+
+@app.get("/api/v1/blake2b/parameters")
+def blake2b_parameters():
+    return {
+        "algorithm":            "BLAKE2b",
+        "word_bits":            64,
+        "block_bits":           1024,
+        "rounds":               12,
+        "digest_bits":          "variable",
+        "default_output_bytes": 64,
+        "max_output_bytes":     64,
+        "max_key_bytes":        64,
+        "max_salt_bytes":       16,
+        "max_person_bytes":     16,
+        "modes":                ["hash", "MAC (key)", "salted", "personalized"],
+        "standard":             "RFC 7693",
+    }
+
+
+@app.get("/api/v1/blake2s/parameters")
+def blake2s_parameters():
+    return {
+        "algorithm":            "BLAKE2s",
+        "word_bits":            32,
+        "block_bits":           512,
+        "rounds":               10,
+        "digest_bits":          "variable",
+        "default_output_bytes": 32,
+        "max_output_bytes":     32,
+        "max_key_bytes":        32,
+        "max_salt_bytes":       8,
+        "max_person_bytes":     8,
+        "modes":                ["hash", "MAC (key)", "salted", "personalized"],
+        "standard":             "RFC 7693",
+    }
+
+
+@app.post("/api/v1/{algo_id}/hash")
+def generic_hash(algo_id: str, req: HashRequest):
+    if algo_id not in HASH_ALGOS:
+        raise HTTPException(404, f"Hash algoritması bulunamadı: {algo_id}")
+    return handle_hash(algo_id, req)
 
 
 # ── Generic endpoint (tüm algoritmalar tek yoldan) ────────────────────────────

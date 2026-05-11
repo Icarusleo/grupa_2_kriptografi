@@ -18,8 +18,11 @@ import { InputNode } from '../nodes/InputNode';
 import { KeyNode } from '../nodes/KeyNode';
 import { Grain128Node } from '../nodes/Grain128Node';
 import { AlgorithmNode } from '../nodes/AlgorithmNode';
+import { HashNode } from '../nodes/HashNode';
 import { OutputNode } from '../nodes/OutputNode';
 import { NodeType } from '../../types/nodes';
+import { getAlgorithm } from '../../types/algorithms';
+import type { AlgorithmId } from '../../types/algorithms';
 import { randomHex } from '../../crypto/utils';
 
 const nodeTypes = {
@@ -28,6 +31,7 @@ const nodeTypes = {
   keyNode: KeyNode,
   grain128Node: Grain128Node,
   algorithmNode: AlgorithmNode,
+  hashNode: HashNode,
   outputNode: OutputNode,
 };
 
@@ -43,6 +47,24 @@ function makeDefaultData(type: NodeType, algorithmId: string) {
       return { label: 'GRAIN-128 AEAD', type: 'grain128', progress: 0, processed: false, lfsrState: new Array(128).fill(0), nfsrState: new Array(128).fill(0), currentRound: 0 };
     case 'algorithmNode':
       return { label: algorithmId, type: 'algorithm', algorithm: algorithmId, progress: 0, processed: false, lfsrState: new Array(128).fill(0), nfsrState: new Array(128).fill(0), currentRound: 0 };
+    case 'hashNode': {
+      const algo = getAlgorithm(algorithmId as AlgorithmId);
+      // XOF / değişken çıktı: digestBits varsa onu kullan (BLAKE2b=64B, BLAKE2s=32B), yoksa 32B
+      const defaultLen = algo.isXof
+        ? (algo.digestBits ? algo.digestBits / 8 : 32)
+        : (algo.digestBits ?? 256) / 8;
+      return {
+        label: algo.name,
+        type: 'hash',
+        algorithm: algo.id,
+        outputLength: defaultLen,
+        blake2Key: '',
+        blake2Salt: '',
+        blake2Person: '',
+        progress: 0,
+        processed: false,
+      };
+    }
     case 'outputNode':
       return { label: 'Output', type: 'output', format: 'hex', progress: 0, processed: false };
   }
@@ -170,6 +192,7 @@ export function FlowCanvas({
             if (n.type === 'keyNode') return '#5a4a8a';
             if (n.type === 'grain128Node') return '#5a6a3a';
             if (n.type === 'algorithmNode') return '#5a6a3a';
+            if (n.type === 'hashNode') return '#6a5a1a';
             if (n.type === 'outputNode') return '#6a3a3a';
             return '#4a7a4a';
           }}
