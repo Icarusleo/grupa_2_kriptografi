@@ -1205,6 +1205,8 @@ def get_hash_algorithms():
             "name": plugin.name,
             "description": plugin.description,
             "digest_size": plugin.digest_size,
+            "group": plugin.sidebar_group,
+            "icon": plugin.sidebar_icon,
             "block_size": getattr(plugin, "block_size", 64),
             "rounds": getattr(plugin, "rounds", 0),
         }

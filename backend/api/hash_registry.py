@@ -52,6 +52,16 @@ class HashPlugin(ABC):
         """Computes and returns the hash of the given data"""
         pass
 
+    @property
+    def sidebar_group(self) -> str:
+        """Sidebar subgroup under Cryptography Hash Functions (e.g. GOST Hash)."""
+        return "Dynamic Hashes"
+
+    @property
+    def sidebar_icon(self) -> str:
+        """Short label for the algorithm picker (symbol or short text)."""
+        return "#"
+
 class HashRegistry:
     """Registry to keep track of all available hash plugins"""
     _plugins: Dict[str, HashPlugin] = {}

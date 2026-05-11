@@ -6,6 +6,8 @@ export interface HashAlgorithmInfo {
   name: string;
   description: string;
   digest_size: number;
+  group?: string;
+  icon?: string;
   block_size?: number;
   rounds?: number;
 }
@@ -61,6 +63,12 @@ export async function fetchHashAlgorithms(): Promise<Record<string, HashAlgorith
         keyBits: 0,
         ivBits: 0,
         tagBits: 0,
+        color: '#d8b4e2',
+        accentColor: '#301040',
+        icon: hashInfo.icon ?? '#',
+        description: hashInfo.description,
+        category: 'Cryptography Hash Functions',
+        group: hashInfo.group ?? 'Dynamic Hashes',
         color: style.color,
         accentColor: style.accentColor,
         icon: style.icon,
