@@ -94,12 +94,17 @@ def _keccak_sponge(message: bytes, rate_bytes: int, output_bytes: int, domain: i
     domain: SHA-3 = 0x06 (suffix 01 + pad10*1 başlangıcı)
             SHAKE = 0x1F (suffix 1111 + pad10*1 başlangıcı)
     """
-    # Pad: msg ‖ domain ‖ 0..0 ‖ 0x80 (son byte'a OR'lanır)
+    # Pad10*1: msg ‖ domain ‖ 0..0 ‖ 0x80. Mesaj rate-1 byte ile bitiyorsa
+    # domain ve son 0x80 aynı byte'a düşer → OR'lanır (tek blok), yoksa
+    # son byte 0x80 olacak şekilde sıfırla doldurulup yeni bir 0x80 eklenir.
     padded = bytearray(message)
-    padded.append(domain)
-    while len(padded) % rate_bytes != rate_bytes - 1:
-        padded.append(0x00)
-    padded.append(0x80)
+    if len(padded) % rate_bytes == rate_bytes - 1:
+        padded.append(domain | 0x80)
+    else:
+        padded.append(domain)
+        while len(padded) % rate_bytes != rate_bytes - 1:
+            padded.append(0x00)
+        padded.append(0x80)
 
     state_bytes = bytearray(200)  # 1600 bit = 200 byte sıfırla başla
 
