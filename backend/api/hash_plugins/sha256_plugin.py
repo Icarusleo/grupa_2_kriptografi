@@ -18,5 +18,13 @@ class SHA256Plugin(HashPlugin):
     def digest_size(self) -> int:
         return 32
 
+    @property
+    def block_size(self) -> int:
+        return 64
+
+    @property
+    def rounds(self) -> int:
+        return 64
+
     def compute_hash(self, data: bytes) -> bytes:
         return hashlib.sha256(data).digest()

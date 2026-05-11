@@ -36,6 +36,17 @@ class HashPlugin(ABC):
         """Size of the hash output in bytes"""
         pass
 
+    # ── Optional metadata (override in subclasses if relevant) ────────────────
+    @property
+    def block_size(self) -> int:
+        """Internal compression block size in bytes (e.g. 64 for MD5/SHA-1/SHA-256)"""
+        return 64
+
+    @property
+    def rounds(self) -> int:
+        """Number of compression rounds processed per block (0 = not applicable)"""
+        return 0
+
     @abstractmethod
     def compute_hash(self, data: bytes) -> bytes:
         """Computes and returns the hash of the given data"""

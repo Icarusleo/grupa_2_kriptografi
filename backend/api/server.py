@@ -1204,7 +1204,9 @@ def get_hash_algorithms():
         algo_id: {
             "name": plugin.name,
             "description": plugin.description,
-            "digest_size": plugin.digest_size
+            "digest_size": plugin.digest_size,
+            "block_size": getattr(plugin, "block_size", 64),
+            "rounds": getattr(plugin, "rounds", 0),
         }
         for algo_id, plugin in HashRegistry.get_all().items()
     }
